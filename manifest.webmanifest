@@ -1,0 +1,16 @@
+{
+  "name": "字卡 · Hanzi",
+  "short_name": "字卡",
+  "description": "Diccionario y flashcards de chino: hanzi, pinyin y español, con dibujo de caracteres.",
+  "lang": "es",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "background_color": "#f6f1e7",
+  "theme_color": "#c8352b",
+  "icons": [
+    { "src": "icons/icon-192.png", "sizes": "192x192", "type": "image/png" },
+    { "src": "icons/icon-512.png", "sizes": "512x512", "type": "image/png" },
+    { "src": "icons/maskable-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
+  ]
+}

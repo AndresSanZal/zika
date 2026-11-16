@@ -1,0 +1,875 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, maximum-scale=1">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="字卡">
+<title>字卡 · Hanzi</title>
+<meta name="theme-color" content="#c8352b">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
+<link rel="icon" href="icons/icon-192.png">
+<style>
+:root{
+  --paper:#f6f1e7; --card:#fffdf8; --ink:#1f1b16; --muted:#7a7064; --line:#e4dccd;
+  --red:#c8352b; --red-soft:#f3d9d4; --green:#2f7d4f; --green-soft:#d8ecdf; --gold:#b8892f;
+  --grid:#e9c9c3;
+  --r:16px;
+  --cjk:"PingFang SC","Hiragino Sans GB","Noto Sans SC","Microsoft YaHei",sans-serif;
+  --ui:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,"Helvetica Neue",Arial,var(--cjk);
+}
+@media (prefers-color-scheme: dark){
+  :root{ --paper:#16130f; --card:#211d18; --ink:#f1ebe0; --muted:#a39886; --line:#3a332a;
+    --red:#e2574b; --red-soft:#4a2622; --green:#4fb07a; --green-soft:#1f3a2a; --gold:#d6a84a; --grid:#5a3530; }
+}
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+html,body{margin:0;background:var(--paper);color:var(--ink);font-family:var(--ui);font-size:16px}
+body{padding:env(safe-area-inset-top) env(safe-area-inset-right) 0 env(safe-area-inset-left);min-height:100vh}
+button,input,select,textarea{font:inherit;color:inherit}
+.wrap{max-width:560px;margin:0 auto;padding:12px 16px calc(96px + env(safe-area-inset-bottom))}
+header.top{display:flex;align-items:center;justify-content:space-between;padding:6px 2px 10px}
+.brand{display:flex;align-items:baseline;gap:8px;white-space:nowrap;min-width:0}
+.brand b{font-family:var(--cjk);font-size:28px;color:var(--red);letter-spacing:2px}
+.brand span{color:var(--muted);font-size:13px}
+@media (max-width:420px){.brand span{display:none}}
+.sync{white-space:nowrap}
+.sync{font-size:12px;color:var(--muted);display:flex;align-items:center;gap:6px}
+.dot{width:8px;height:8px;border-radius:50%;background:var(--gold)}
+.dot.ok{background:var(--green)} .dot.err{background:var(--red)}
+.banner{background:var(--red-soft);border-radius:12px;padding:10px 12px;font-size:14px;margin-bottom:12px;display:none}
+.banner.show{display:block}
+.banner.upd{background:var(--green-soft)}
+.banner.upd.show{display:flex;align-items:center;justify-content:space-between;gap:10px}
+.toast{position:fixed;left:50%;bottom:calc(84px + env(safe-area-inset-bottom));transform:translateX(-50%) translateY(20px);background:var(--ink);color:var(--paper);padding:10px 16px;border-radius:12px;font-size:14px;opacity:0;pointer-events:none;transition:.25s;z-index:60;max-width:90vw;text-align:center}
+.toast.show{opacity:1;transform:translateX(-50%) translateY(0)}
+
+nav.tabs{position:fixed;left:0;right:0;bottom:0;z-index:20;background:color-mix(in srgb,var(--card) 92%,transparent);
+  backdrop-filter:blur(12px);-webkit-backdrop-filter:blur(12px);border-top:1px solid var(--line);
+  display:flex;justify-content:center;padding:6px 8px calc(6px + env(safe-area-inset-bottom))}
+nav.tabs a{flex:1;max-width:180px;text-align:center;text-decoration:none;color:var(--muted);padding:6px 0;border-radius:12px;font-size:12px}
+nav.tabs a i{display:block;font-style:normal;font-family:var(--cjk);font-size:22px;line-height:1.2}
+nav.tabs a.on{color:var(--red)}
+
+.view{display:none} .view.on{display:block}
+.card{background:var(--card);border:1px solid var(--line);border-radius:var(--r);padding:16px;margin-bottom:12px}
+h2{font-size:20px;margin:4px 0 12px}
+h3{font-size:15px;margin:0 0 8px;color:var(--muted);font-weight:600}
+.row{display:flex;gap:10px;align-items:center;flex-wrap:wrap}
+.grow{flex:1}
+.stats{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-bottom:12px}
+.stat{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:12px;text-align:center}
+.stat b{display:block;font-size:26px;font-variant-numeric:tabular-nums}
+.stat span{font-size:12px;color:var(--muted)}
+label.f{display:block;font-size:13px;color:var(--muted);margin:10px 0 4px}
+input[type=text],input[type=search],input[type=number],select,textarea{width:100%;background:var(--paper);border:1px solid var(--line);
+  border-radius:12px;padding:11px 12px;outline:none;font-size:16px}
+input:focus,select:focus,textarea:focus{border-color:var(--red)}
+textarea{min-height:120px;resize:vertical;font-family:var(--cjk)}
+.big-input{font-family:var(--cjk);font-size:26px!important}
+.btn{appearance:none;border:1px solid var(--line);background:var(--card);border-radius:12px;padding:11px 16px;cursor:pointer;font-weight:600}
+.btn:active{transform:scale(.98)}
+.btn.primary{background:var(--red);border-color:var(--red);color:#fff}
+.btn.good{background:var(--green);border-color:var(--green);color:#fff}
+.btn.bad{background:var(--red);border-color:var(--red);color:#fff}
+.btn.ghost{background:transparent}
+.btn.small{padding:7px 11px;font-size:14px}
+.btn.block{width:100%}
+.btn[disabled]{opacity:.45}
+.seg{display:flex;background:var(--paper);border:1px solid var(--line);border-radius:12px;padding:3px}
+.seg button{flex:1;border:0;background:transparent;border-radius:9px;padding:8px;font-weight:600;color:var(--muted);cursor:pointer}
+.seg button.on{background:var(--card);color:var(--ink);box-shadow:0 1px 3px rgba(0,0,0,.08)}
+.hint{font-size:13px;color:var(--muted)}
+.msg{font-size:14px;margin-top:8px;min-height:1.2em}
+.msg.ok{color:var(--green)} .msg.err{color:var(--red)}
+
+/* Study session */
+.progress{height:6px;background:var(--line);border-radius:6px;overflow:hidden;margin:4px 0 12px}
+.progress i{display:block;height:100%;background:var(--red);width:0;transition:width .3s}
+.sess-top{display:flex;justify-content:space-between;align-items:center;font-size:13px;color:var(--muted)}
+.prompt{text-align:center;padding:8px 0 4px}
+.prompt .py{font-size:26px;font-weight:600;letter-spacing:.5px}
+.prompt .es{font-size:18px;color:var(--muted);margin-top:4px}
+.prompt .hz{font-family:var(--cjk);font-size:72px;line-height:1.15}
+.cells{display:grid;gap:10px;justify-content:center;margin:14px 0 10px}
+.cell{position:relative;border-radius:12px;background:var(--card);border:2px solid var(--grid);overflow:hidden;touch-action:none}
+.cell svg.grid{position:absolute;inset:0;width:100%;height:100%;pointer-events:none}
+.cell .sol{position:absolute;inset:0;opacity:0;transition:opacity .25s;pointer-events:none}
+.cell canvas{position:absolute;inset:0;width:100%;height:100%;touch-action:none;transition:opacity .25s}
+.cells.revealed .sol{opacity:.55}
+.cells.animating .sol{opacity:1}
+.cells.animating canvas{opacity:.15}
+.tools{display:flex;gap:8px;justify-content:center;flex-wrap:wrap}
+.grade{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:12px}
+.grade .btn{padding:15px;font-size:17px}
+.answer{text-align:center;margin-top:6px;display:none}
+.answer.show{display:block}
+.answer .py{font-size:22px;font-weight:600}
+.answer .es{color:var(--muted)}
+.answer .hzline{font-family:var(--cjk);font-size:40px}
+
+/* Dictionary */
+.list{display:flex;flex-direction:column;gap:6px}
+.item{display:flex;gap:12px;align-items:center;background:var(--card);border:1px solid var(--line);border-radius:14px;padding:10px 12px;cursor:pointer;text-align:left;width:100%}
+.item .h{font-family:var(--cjk);font-size:28px;min-width:64px}
+.item .t{flex:1;min-width:0}
+.item .p{font-weight:600}
+.item .e{color:var(--muted);font-size:14px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.lvl{display:flex;gap:2px}
+.lvl i{width:4px;height:14px;border-radius:2px;background:var(--line)}
+.lvl i.on{background:var(--green)}
+.chips{display:flex;gap:6px;flex-wrap:wrap}
+.chip{font-size:12px;padding:3px 8px;border-radius:20px;background:var(--paper);border:1px solid var(--line);color:var(--muted)}
+
+/* Modal */
+.modal{position:fixed;inset:0;background:rgba(0,0,0,.4);z-index:50;display:none;align-items:flex-end;justify-content:center}
+.modal.show{display:flex}
+.sheet{background:var(--card);width:100%;max-width:560px;border-radius:20px 20px 0 0;padding:18px 16px calc(18px + env(safe-area-inset-bottom));max-height:92vh;overflow:auto}
+.sheet .close{float:right}
+.detail-chars{display:flex;gap:8px;justify-content:center;flex-wrap:wrap;margin:8px 0}
+.detail-chars .cell{width:120px;height:120px}
+.center{text-align:center}
+.empty{text-align:center;color:var(--muted);padding:30px 10px}
+.danger{color:var(--red);border-color:var(--red)}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header class="top">
+    <div class="brand"><b>字卡</b><span>hanzi · pinyin · español</span></div>
+    <div class="sync"><span class="dot" id="syncDot"></span><span id="syncTxt">Cargando…</span></div>
+  </header>
+  <div class="banner" id="banner"></div>
+  <div class="banner upd" id="updBanner">Hay una versión nueva de la app. <button class="btn small" id="reloadBtn">Actualizar</button></div>
+
+  <!-- ESTUDIAR -->
+  <section class="view" id="v-estudiar">
+    <div id="studyHome">
+      <div class="stats">
+        <div class="stat"><b id="stDue">–</b><span>para repasar</span></div>
+        <div class="stat"><b id="stNew">–</b><span>nuevas</span></div>
+        <div class="stat"><b id="stTotal">–</b><span>en total</span></div>
+      </div>
+      <div class="card">
+        <h3>Modo</h3>
+        <div class="seg" id="modeSeg">
+          <button data-mode="write" class="on">✍️ Escribir</button>
+          <button data-mode="read">👁 Reconocer</button>
+        </div>
+        <p class="hint" id="modeHint">Ves el pinyin y el significado, dibujas el carácter y lo revelas.</p>
+        <label class="f">Vocabulario</label>
+        <select id="tagFilter"></select>
+        <label class="f">Palabras nuevas por sesión</label>
+        <input type="number" id="newPer" min="0" max="100" value="10" inputmode="numeric">
+        <div style="height:14px"></div>
+        <button class="btn primary block" id="startBtn">Empezar sesión</button>
+        <button class="btn ghost block" id="practiceBtn" style="margin-top:8px">Repasar todo el grupo (sin esperar fechas)</button>
+      </div>
+    </div>
+
+    <div id="session" style="display:none">
+      <div class="sess-top"><span id="sessCount">1 / 10</span><button class="btn small ghost" id="quitBtn">Terminar</button></div>
+      <div class="progress"><i id="sessBar"></i></div>
+      <div class="card">
+        <div class="prompt" id="prompt"></div>
+        <div class="cells" id="cells"></div>
+        <div class="tools" id="drawTools">
+          <button class="btn small" id="undoBtn">↶ Deshacer</button>
+          <button class="btn small" id="clearBtn">Borrar</button>
+        </div>
+        <div class="answer" id="answer"></div>
+        <div style="height:12px"></div>
+        <button class="btn primary block" id="revealBtn">Revelar</button>
+        <div id="afterReveal" style="display:none">
+          <div class="tools" id="revealTools">
+            <button class="btn small" id="animBtn">▶ Orden de trazos</button>
+            <button class="btn small" id="quizBtn">✎ Practicar trazos</button>
+          </div>
+          <div class="grade">
+            <button class="btn bad" id="badBtn">✗ Mal</button>
+            <button class="btn good" id="goodBtn">✓ Bien</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div id="sessDone" style="display:none" class="card center">
+      <h2>¡Sesión terminada! 🎉</h2>
+      <div class="stats" style="margin-top:12px">
+        <div class="stat"><b id="dGood">0</b><span>bien</span></div>
+        <div class="stat"><b id="dBad">0</b><span>fallos</span></div>
+        <div class="stat"><b id="dLeft">0</b><span>quedan hoy</span></div>
+      </div>
+      <div id="dFailed" class="chips" style="justify-content:center;margin-bottom:12px"></div>
+      <button class="btn primary block" id="backHome">Volver</button>
+    </div>
+  </section>
+
+  <!-- DICCIONARIO -->
+  <section class="view" id="v-diccionario">
+    <input type="search" id="q" placeholder="Buscar: 你好, nihao, hola…" autocomplete="off">
+    <div class="row" style="margin:10px 0">
+      <select id="dictTag" class="grow"></select>
+      <span class="hint" id="dictCount"></span>
+    </div>
+    <div class="list" id="list"></div>
+  </section>
+
+  <!-- AÑADIR -->
+  <section class="view" id="v-anadir">
+    <div class="card">
+      <h2 id="formTitle">Añadir palabra</h2>
+      <label class="f">Hanzi</label>
+      <input type="text" id="fH" class="big-input" placeholder="你好" autocomplete="off">
+      <label class="f">Pinyin <span class="hint">(se rellena solo; corrígelo si hace falta)</span></label>
+      <input type="text" id="fP" placeholder="nǐhǎo" autocomplete="off">
+      <label class="f">Significado en español</label>
+      <input type="text" id="fE" placeholder="hola" autocomplete="off">
+      <label class="f">Etiquetas <span class="hint">(separadas por comas)</span></label>
+      <input type="text" id="fT" placeholder="Lección 8, saludos" autocomplete="off">
+      <div style="height:14px"></div>
+      <div class="row">
+        <button class="btn primary grow" id="saveBtn">Guardar</button>
+        <button class="btn" id="cancelEdit" style="display:none">Cancelar</button>
+      </div>
+      <div class="msg" id="formMsg"></div>
+    </div>
+
+    <div class="card">
+      <h3>Añadir varias de golpe</h3>
+      <p class="hint">Una por línea: <code>hanzi | pinyin | significado | etiquetas</code>. El pinyin puede ir vacío y se genera solo.</p>
+      <textarea id="bulk" placeholder="朋友 | | amigo | Lección 8&#10;喝茶 | hē chá | beber té | Lección 8"></textarea>
+      <div style="height:10px"></div>
+      <button class="btn block" id="bulkBtn">Añadir todas</button>
+      <div class="msg" id="bulkMsg"></div>
+    </div>
+
+    <div class="card">
+      <h3>Sin conexión y actualizaciones</h3>
+      <p class="hint" id="offStatus">Comprobando…</p>
+      <div class="row">
+        <button class="btn grow" id="dlStrokes" style="display:none">Descargar trazos (≈10 MB)</button>
+        <button class="btn grow" id="checkBtn">Buscar vocabulario nuevo</button>
+      </div>
+      <p class="hint">Cuando tengas conexión, la app comprueba sola si hay palabras nuevas de tus clases y las añade sin tocar tu progreso.</p>
+    </div>
+
+    <div class="card">
+      <h3>Copia de seguridad</h3>
+      <p class="hint">Tu progreso solo está en este móvil. Guarda de vez en cuando una copia en Archivos o iCloud.</p>
+      <div class="row">
+        <button class="btn grow" id="exportBtn">Descargar copia</button>
+        <button class="btn grow" id="copyBtn">Copiar como texto</button>
+      </div>
+      <div style="height:8px"></div>
+      <button class="btn ghost block" id="importToggle">Restaurar una copia…</button>
+      <div id="importBox" style="display:none;margin-top:10px">
+        <input type="file" id="importFile" accept="application/json,.json,.txt">
+        <div style="height:8px"></div>
+        <textarea id="importTxt" placeholder="…o pega aquí el texto de la copia"></textarea>
+        <div style="height:8px"></div>
+        <button class="btn block" id="importBtn">Restaurar texto pegado</button>
+      </div>
+      <div class="msg" id="bkMsg"></div>
+    </div>
+  </section>
+</div>
+
+<nav class="tabs">
+  <a href="#estudiar" data-v="estudiar"><i>学</i>Estudiar</a>
+  <a href="#diccionario" data-v="diccionario"><i>典</i>Diccionario</a>
+  <a href="#anadir" data-v="anadir"><i>加</i>Añadir</a>
+</nav>
+
+<div class="toast" id="toast"></div>
+<div class="modal" id="modal"><div class="sheet" id="sheet"></div></div>
+
+<script src="lib/hanzi-writer.min.js"></script>
+<script src="lib/pinyin-pro.js"></script>
+<script>
+(() => {
+"use strict";
+const $ = s => document.querySelector(s);
+const esc = s => String(s ?? "").replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+const DAY = 86400000;
+const INTERVALS = [0, 1, 2, 4, 7, 15, 30, 60, 120]; // días por caja
+const MAXBOX = INTERVALS.length - 1;
+const CJK = /[㐀-鿿豈-﫿\u{20000}-\u{2ffff}]/u;
+
+/* ---------- Datos de trazos (Hanzi Writer) ---------- */
+const shardCache = new Map();
+function loadShard(n){
+  if(!shardCache.has(n)){
+    const url = `chardata/s${n}.json`;
+    shardCache.set(n, (async () => {
+      try{ const c = await caches.open("zika-chars-v1"); const hit = await c.match(url); if(hit) return hit.json();
+        const r = await fetch(url); if(!r.ok) throw new Error(r.status); c.put(url, r.clone()); return r.json(); }
+      catch(e){ const r = await fetch(url); if(!r.ok) throw new Error(r.status); return r.json(); }
+    })().catch(e => { shardCache.delete(n); throw e; }));
+  }
+  return shardCache.get(n);
+}
+function charLoader(ch, onOk, onErr){
+  loadShard(ch.codePointAt(0) % 128).then(s => s[ch] ? onOk(s[ch]) : onErr(new Error("sin datos"))).catch(onErr);
+}
+
+/* ---------- Utilidades ---------- */
+const idFor = h => "w-" + [...h].map(c => c.codePointAt(0).toString(16)).join("-");
+const strip = s => String(s||"").normalize("NFD").replace(/[̀-ͯ]/g,"").replace(/ü/g,"u").toLowerCase();
+const normPy = s => strip(s).replace(/v/g,"u").replace(/[\s'’\d·-]/g,"");
+const hanziOf = h => [...h].filter(c => CJK.test(c));
+function autoPinyin(h){
+  try{ return pinyinPro.pinyin(h, {type:"array", toneType:"symbol", nonZh:"removed"}).join(""); }catch(e){ return ""; }
+}
+const parseTags = s => String(s||"").split(/[,，;；]/).map(t => t.trim()).filter(Boolean);
+const startOfToday = () => { const d = new Date(); d.setHours(0,0,0,0); return d.getTime(); };
+const isNew = w => !w.srs || !w.srs.last;
+const isDue = (w, now=Date.now()) => !isNew(w) && (w.srs.due||0) <= now;
+const fmtDate = t => new Date(t).toLocaleDateString("es-ES",{day:"numeric",month:"short"});
+
+/* ---------- Almacenamiento local (todo vive en este dispositivo) ---------- */
+const LS_KEY = "zika-words-v1", LS_META = "zika-meta-v1";
+const words = new Map();
+let meta = { vocabVersion: 0, deleted: [], lastCheck: 0 };
+
+function lsGet(k){ try{ return JSON.parse(localStorage.getItem(k) || "null"); }catch(e){ return null; } }
+function lsSet(){
+  try{ localStorage.setItem(LS_KEY, JSON.stringify([...words.values()])); localStorage.setItem(LS_META, JSON.stringify(meta)); }
+  catch(e){ banner("No se pudo guardar en el dispositivo (" + e.name + "). Haz una copia de seguridad."); }
+}
+function setSync(state, txt){
+  $("#syncDot").className = "dot " + (state==="ok"?"ok":state==="err"?"err":"");
+  $("#syncTxt").textContent = txt;
+}
+function banner(txt){ const b = $("#banner"); b.textContent = txt||""; b.classList.toggle("show", !!txt); }
+let toastT = null;
+function toast(txt){ const t = $("#toast"); t.textContent = txt; t.classList.add("show"); clearTimeout(toastT); toastT = setTimeout(()=>t.classList.remove("show"), 3500); }
+
+async function saveWord(w){ meta.deleted = meta.deleted.filter(x => x !== w.id); words.set(w.id, w); lsSet(); renderAll(); }
+async function removeWord(id){ words.delete(id); if(!meta.deleted.includes(id)) meta.deleted.push(id); lsSet(); renderAll(); }
+async function updateSrs(w, srs){ w = {...w, srs}; words.set(w.id, w); lsSet(); }
+
+(lsGet(LS_KEY)||[]).forEach(w => w && w.id && words.set(w.id, w));
+meta = Object.assign(meta, lsGet(LS_META)||{});
+
+/* Fusiona el vocabulario publicado (vocab.json) sin tocar tu progreso ni tus ediciones */
+function mergeVocab(remote){
+  const first = words.size === 0;
+  let added = 0, updated = 0, removed = 0; const newTags = new Set();
+  for(const id of (remote.deleted||[])){
+    const w = words.get(id);
+    if(w && !w.localEdit){ words.delete(id); removed++; }
+  }
+  for(const r of (remote.words||[])){
+    if(!r || !r.id || !r.h) continue;
+    if(meta.deleted.includes(r.id)) continue;           // la borraste tú: no vuelve
+    const l = words.get(r.id);
+    if(!l){
+      const w = {id:r.id, h:r.h, p:r.p, es:r.es, tags:r.tags||[], created:r.created||Date.now(), src:r.src||"vocab"};
+      if(first && r.srs) w.srs = r.srs;                  // solo al instalar: progreso migrado
+      words.set(r.id, w); added++; (r.tags||[]).forEach(t => newTags.add(t));
+    } else if(!l.localEdit){
+      const same = l.h===r.h && l.p===r.p && l.es===r.es && JSON.stringify(l.tags||[])===JSON.stringify(r.tags||[]) && l.created===r.created;
+      if(!same){ words.set(r.id, {...l, h:r.h, p:r.p, es:r.es, tags:r.tags||[], created:r.created||l.created}); updated++; }
+    }
+  }
+  meta.vocabVersion = remote.version || meta.vocabVersion;
+  lsSet();
+  return {added, updated, removed, tags:[...newTags], first};
+}
+
+async function checkVocab(manual){
+  if(!navigator.onLine && !manual){ setSync("wait", "Sin conexión · todo guardado aquí"); return; }
+  setSync("wait", "Buscando vocabulario nuevo…");
+  try{
+    const ctrl = new AbortController(); const to = setTimeout(()=>ctrl.abort(), 12000);
+    const r = await fetch("vocab.json?t=" + Date.now(), {cache:"no-store", signal:ctrl.signal});
+    clearTimeout(to);
+    if(!r.ok) throw new Error(r.status);
+    const remote = await r.json();
+    meta.lastCheck = Date.now();
+    if((remote.version||0) <= meta.vocabVersion && words.size){ lsSet(); setSync("ok", "Al día · " + words.size + " palabras"); if(manual) toast("Ya tienes el vocabulario más reciente."); return; }
+    const res = mergeVocab(remote);
+    renderAll(); setSync("ok", "Al día · " + words.size + " palabras");
+    const parts = [];
+    const pl = (n, one, many) => n + " " + (n === 1 ? one : many);
+    if(res.added) parts.push(pl(res.added, "palabra nueva", "palabras nuevas") + (res.tags.length && !res.first ? " (" + res.tags.slice(0,3).join(", ") + ")" : ""));
+    if(res.updated) parts.push(pl(res.updated, "corregida", "corregidas"));
+    if(res.removed) parts.push(pl(res.removed, "eliminada", "eliminadas"));
+    if(parts.length) toast("✓ " + parts.join(" · "));
+    else if(manual) toast("Ya tienes el vocabulario más reciente.");
+  }catch(e){
+    console.warn("checkVocab:", e);
+    setSync(words.size ? "wait" : "err", words.size ? "Sin conexión · todo guardado aquí" : "Sin conexión");
+    if(manual) toast("No se pudo conectar. Inténtalo con conexión (o VPN).");
+    if(!words.size) banner("Para el primer uso necesitas conexión: así se descarga el vocabulario. Después funciona sin internet.");
+  }
+}
+
+/* ---------- Modo sin conexión: service worker y trazos ---------- */
+const CHAR_CACHE = "zika-chars-v1", NSHARDS = 128;
+async function strokesStatus(){
+  try{ const c = await caches.open(CHAR_CACHE); const keys = await c.keys(); return keys.length; }catch(e){ return -1; }
+}
+async function renderOffline(){
+  const n = await strokesStatus(); const el = $("#offStatus"); if(!el) return;
+  if(n < 0){ el.textContent = "Este navegador no permite guardar los trazos."; return; }
+  el.textContent = n >= NSHARDS ? "✓ Trazos de todos los caracteres guardados en el dispositivo." : `Trazos guardados: ${Math.round(n/NSHARDS*100)} %`;
+  $("#dlStrokes").style.display = n >= NSHARDS ? "none" : "";
+}
+let dlRunning = false;
+async function downloadStrokes(){
+  if(dlRunning) return; dlRunning = true;
+  const btn = $("#dlStrokes"); btn.disabled = true;
+  try{
+    const c = await caches.open(CHAR_CACHE);
+    const have = new Set((await c.keys()).map(k => new URL(k.url).pathname.split("/").pop()));
+    const todo = []; for(let i=0;i<NSHARDS;i++){ if(!have.has(`s${i}.json`)) todo.push(i); }
+    let done = NSHARDS - todo.length;
+    for(let k=0;k<todo.length;k+=4){
+      await Promise.all(todo.slice(k,k+4).map(async i => {
+        const url = `chardata/s${i}.json`; const r = await fetch(url); if(r.ok){ await c.put(url, r); done++; }
+      }));
+      btn.textContent = `Descargando… ${Math.round(done/NSHARDS*100)} %`;
+    }
+    toast("✓ Trazos guardados: ya funciona todo sin conexión.");
+  }catch(e){ toast("Se cortó la descarga. Vuelve a intentarlo con conexión."); }
+  btn.disabled = false; btn.textContent = "Descargar trazos (≈10 MB)"; dlRunning = false; renderOffline();
+}
+
+async function startOffline(){
+  if("serviceWorker" in navigator){
+    try{
+      const reg = await navigator.serviceWorker.register("sw.js");
+      reg.addEventListener("updatefound", () => {
+        const nw = reg.installing;
+        nw && nw.addEventListener("statechange", () => {
+          if(nw.state === "installed" && navigator.serviceWorker.controller) $("#updBanner").classList.add("show");
+        });
+      });
+    }catch(e){}
+  }
+  try{ if(navigator.storage && navigator.storage.persist) await navigator.storage.persist(); }catch(e){}
+  await renderOffline();
+  // descarga automática de trazos la primera vez que hay conexión
+  const n = await strokesStatus();
+  if(n >= 0 && n < NSHARDS && navigator.onLine) downloadStrokes();
+}
+
+/* ---------- Navegación ---------- */
+const VIEWS = ["estudiar","diccionario","anadir"];
+function route(){
+  const v = VIEWS.includes(location.hash.slice(1)) ? location.hash.slice(1) : "estudiar";
+  VIEWS.forEach(n => $("#v-"+n).classList.toggle("on", n===v));
+  document.querySelectorAll("nav.tabs a").forEach(a => a.classList.toggle("on", a.dataset.v===v));
+  window.scrollTo(0,0);
+}
+window.addEventListener("hashchange", route);
+
+/* ---------- Etiquetas / filtros ---------- */
+function allTags(){
+  const s = new Set(); words.forEach(w => (w.tags||[]).forEach(t => s.add(t)));
+  return [...s].sort((a,b) => a.localeCompare(b,"es",{numeric:true}));
+}
+function fillTagSelect(sel, firstLabel){
+  const cur = sel.value; const tags = allTags();
+  sel.innerHTML = `<option value="">${firstLabel}</option>` + tags.map(t => `<option value="${esc(t)}">${esc(t)}</option>`).join("");
+  if(tags.includes(cur)) sel.value = cur;
+}
+const inTag = (w, tag) => !tag || (w.tags||[]).includes(tag);
+
+/* ---------- Render general ---------- */
+function renderAll(){
+  fillTagSelect($("#tagFilter"), "Todo el vocabulario");
+  fillTagSelect($("#dictTag"), "Todas las etiquetas");
+  renderStats(); renderList();
+}
+function renderStats(){
+  const tag = $("#tagFilter").value; const now = Date.now();
+  let due=0, nw=0, tot=0;
+  words.forEach(w => { if(!inTag(w,tag)) return; tot++; if(isNew(w)) nw++; else if(isDue(w,now)) due++; });
+  $("#stDue").textContent = due; $("#stNew").textContent = nw; $("#stTotal").textContent = tot;
+}
+
+/* ---------- Diccionario ---------- */
+function levelBars(w){
+  const b = w.srs ? (w.srs.box||0) : 0; let h = "";
+  for(let i=1;i<=5;i++) h += `<i class="${b>=i?"on":""}"></i>`;
+  return `<span class="lvl" title="Nivel ${b}">${h}</span>`;
+}
+function renderList(){
+  const q = $("#q").value.trim(); const tag = $("#dictTag").value;
+  const qh = q, qp = normPy(q), qe = strip(q);
+  let arr = [...words.values()].filter(w => inTag(w,tag));
+  if(q){
+    arr = arr.filter(w => (w.h||"").includes(qh) || (qp && normPy(w.p).includes(qp)) || strip(w.es).includes(qe));
+    arr.sort((a,b) => score(b)-score(a) || (a.created||0)-(b.created||0));
+  } else arr.sort((a,b) => (b.created||0)-(a.created||0));
+  function score(w){ return (w.h===qh?3:0) + (normPy(w.p)===qp?2:0) + (strip(w.es)===qe?2:0); }
+  $("#dictCount").textContent = arr.length + (arr.length===1?" palabra":" palabras");
+  const list = $("#list");
+  if(!arr.length){ list.innerHTML = `<div class="empty">${words.size ? "Nada encontrado." : "Todavía no hay palabras. ¡Añade la primera!"}</div>`; return; }
+  list.innerHTML = arr.slice(0,400).map(w => `
+    <button class="item" data-id="${esc(w.id)}">
+      <span class="h">${esc(w.h)}</span>
+      <span class="t"><div class="p">${esc(w.p)}</div><div class="e">${esc(w.es)}</div></span>
+      ${levelBars(w)}
+    </button>`).join("");
+}
+$("#q").addEventListener("input", renderList);
+$("#dictTag").addEventListener("change", renderList);
+$("#list").addEventListener("click", e => { const it = e.target.closest(".item"); if(it) openDetail(it.dataset.id); });
+
+/* ---------- Ficha de palabra ---------- */
+function gridSVG(){
+  return `<svg class="grid" viewBox="0 0 100 100" preserveAspectRatio="none"><g stroke="var(--grid)" stroke-width=".6" stroke-dasharray="2 2" fill="none">
+    <line x1="0" y1="0" x2="100" y2="100"/><line x1="100" y1="0" x2="0" y2="100"/><line x1="50" y1="0" x2="50" y2="100"/><line x1="0" y1="50" x2="100" y2="50"/></g></svg>`;
+}
+function writerOpts(size, extra){
+  return Object.assign({width:size, height:size, padding:Math.round(size*0.06), charDataLoader:charLoader,
+    strokeColor:getComputedStyle(document.documentElement).getPropertyValue("--ink").trim()||"#222",
+    radicalColor:getComputedStyle(document.documentElement).getPropertyValue("--red").trim()||"#c8352b",
+    outlineColor:getComputedStyle(document.documentElement).getPropertyValue("--line").trim()||"#ddd",
+    strokeAnimationSpeed:1.2, delayBetweenStrokes:180, showOutline:true}, extra||{});
+}
+async function animateSeq(ws){ for(const w of ws){ await new Promise(r => { try{ w.animateCharacter({onComplete:r}); }catch(e){ r(); } }); } }
+
+function openModal(html){ $("#sheet").innerHTML = html; $("#modal").classList.add("show"); }
+function closeModal(){ $("#modal").classList.remove("show"); $("#sheet").innerHTML = ""; }
+$("#modal").addEventListener("click", e => { if(e.target.id==="modal") closeModal(); });
+
+function openDetail(id){
+  const w = words.get(id); if(!w) return;
+  const chars = hanziOf(w.h);
+  const s = w.srs||{};
+  openModal(`
+    <button class="btn small ghost close" data-act="close">Cerrar</button>
+    <div style="clear:both"></div>
+    <div class="detail-chars" id="dChars">${chars.map(()=>`<div class="cell">${gridSVG()}<div class="sol" style="opacity:1"></div></div>`).join("")}</div>
+    <div class="center"><div style="font-size:24px;font-weight:600">${esc(w.p)}</div><div style="font-size:18px;color:var(--muted);margin-top:2px">${esc(w.es)}</div></div>
+    <div class="chips" style="justify-content:center;margin:10px 0">${(w.tags||[]).map(t=>`<span class="chip">${esc(t)}</span>`).join("")}</div>
+    <p class="hint center">${isNew(w) ? "Aún no estudiada" : `Nivel ${s.box||0} · ${s.ok||0} bien / ${s.bad||0} mal · próximo repaso: ${fmtDate(s.due)}`}</p>
+    <div class="row" style="justify-content:center">
+      <button class="btn small" data-act="anim">▶ Orden de trazos</button>
+      <button class="btn small" data-act="quiz">✎ Practicar trazos</button>
+    </div>
+    <div style="height:10px"></div>
+    <div class="row">
+      <button class="btn grow" data-act="edit">Editar</button>
+      <button class="btn grow" data-act="reset">Reiniciar</button>
+      <button class="btn grow danger" data-act="del">Borrar</button>
+    </div>`);
+  const cells = [...document.querySelectorAll("#dChars .sol")];
+  const writers = cells.map((el,i) => HanziWriter.create(el, chars[i], writerOpts(120)));
+  $("#sheet").onclick = async e => {
+    const b = e.target.closest("[data-act]"); if(!b) return;
+    const a = b.dataset.act;
+    if(a==="close") closeModal();
+    if(a==="anim") animateSeq(writers);
+    if(a==="quiz") openQuiz(chars);
+    if(a==="edit"){ closeModal(); startEdit(id); }
+    if(a==="reset"){ const {srs, ...rest} = w; await saveWord(rest); closeModal(); }
+    if(a==="del"){
+      if(b.dataset.sure){ await removeWord(id); closeModal(); }
+      else { b.dataset.sure = "1"; b.textContent = "¿Seguro? Toca otra vez"; }
+    }
+  };
+}
+
+/* Práctica guiada de trazos (Hanzi Writer quiz) */
+function openQuiz(chars){
+  let i = 0;
+  openModal(`
+    <button class="btn small ghost close" data-act="close">Cerrar</button>
+    <h2>Practicar trazos</h2>
+    <p class="hint">Traza cada carácter en orden. Si fallas un trazo varias veces, te lo marca.</p>
+    <div class="center"><div class="cell" style="width:260px;height:260px;margin:0 auto">${gridSVG()}<div class="sol" id="quizHost" style="opacity:1;pointer-events:auto"></div></div></div>
+    <p class="center" id="quizInfo" style="font-family:var(--cjk);font-size:22px"></p>
+    <div class="row" style="justify-content:center"><button class="btn small" data-act="again">Repetir</button><button class="btn small" data-act="next">Siguiente</button></div>`);
+  let wr = null;
+  function start(){
+    $("#quizHost").innerHTML = "";
+    $("#quizInfo").innerHTML = chars.map((c,k)=> k===i?`<b style="color:var(--red)">${esc(c)}</b>`:esc(c)).join(" ");
+    wr = HanziWriter.create($("#quizHost"), chars[i], writerOpts(260, {showCharacter:false, showOutline:true, showHintAfterMisses:3, highlightOnComplete:true, drawingWidth:22}));
+    wr.quiz({onComplete: () => { $("#quizInfo").insertAdjacentHTML("beforeend"," ✓"); }});
+  }
+  start();
+  $("#sheet").onclick = e => {
+    const b = e.target.closest("[data-act]"); if(!b) return;
+    if(b.dataset.act==="close") closeModal();
+    if(b.dataset.act==="again") start();
+    if(b.dataset.act==="next"){ i = (i+1) % chars.length; start(); }
+  };
+}
+
+/* ---------- Añadir / editar ---------- */
+let editingId = null, pyTouched = false;
+$("#fH").addEventListener("input", () => { if(!pyTouched) $("#fP").value = autoPinyin($("#fH").value.trim()); dupCheck(); });
+$("#fP").addEventListener("input", () => { pyTouched = $("#fP").value.trim() !== ""; });
+function dupCheck(){
+  const h = $("#fH").value.trim(); const m = $("#formMsg");
+  const ex = h && words.get(idFor(h));
+  if(ex && ex.id !== editingId){ m.className = "msg err"; m.textContent = `Ya existe: ${ex.h} · ${ex.p} · ${ex.es}. Si guardas, se actualizará.`; }
+  else if(m.classList.contains("err")) { m.textContent = ""; m.className = "msg"; }
+}
+function resetForm(){
+  editingId = null; pyTouched = false;
+  ["#fH","#fP","#fE","#fT"].forEach(s => $(s).value = "");
+  $("#formTitle").textContent = "Añadir palabra"; $("#cancelEdit").style.display = "none";
+}
+function startEdit(id){
+  const w = words.get(id); if(!w) return;
+  editingId = id; pyTouched = true;
+  $("#fH").value = w.h; $("#fP").value = w.p; $("#fE").value = w.es; $("#fT").value = (w.tags||[]).join(", ");
+  $("#formTitle").textContent = "Editar palabra"; $("#cancelEdit").style.display = "";
+  $("#formMsg").textContent = ""; location.hash = "anadir";
+}
+$("#cancelEdit").addEventListener("click", () => { resetForm(); $("#formMsg").textContent=""; });
+
+function buildWord(h, p, es, tags, base){
+  const id = idFor(h);
+  const prev = base || words.get(id);
+  const w = {id, h, p: p || autoPinyin(h), es, tags, created: prev?.created || Date.now(), src: prev?.src || "manual", localEdit: true};
+  if(prev?.srs) w.srs = prev.srs;
+  return w;
+}
+$("#saveBtn").addEventListener("click", async () => {
+  const h = $("#fH").value.trim(), p = $("#fP").value.trim(), es = $("#fE").value.trim(), tags = parseTags($("#fT").value);
+  const m = $("#formMsg");
+  if(!h || !hanziOf(h).length){ m.className="msg err"; m.textContent = "Escribe al menos un carácter chino."; return; }
+  if(!es){ m.className="msg err"; m.textContent = "Falta el significado en español."; return; }
+  const base = editingId ? words.get(editingId) : null;
+  const w = buildWord(h, p, es, tags, base);
+  try{
+    if(editingId && editingId !== w.id) await removeWord(editingId);
+    await saveWord(w);
+    m.className="msg ok"; m.textContent = `Guardado: ${w.h} · ${w.p} · ${w.es}`;
+    const keepTags = $("#fT").value; resetForm(); $("#fT").value = keepTags; $("#fH").focus();
+  }catch(e){ m.className="msg err"; m.textContent = "No se pudo guardar ("+(e.code||e.message)+")."; }
+});
+
+$("#bulkBtn").addEventListener("click", async () => {
+  const lines = $("#bulk").value.split(/\n/).map(l => l.trim()).filter(Boolean);
+  const m = $("#bulkMsg"); let ok = 0, bad = [];
+  for(const line of lines){
+    const parts = line.split(/[|｜\t]/).map(s => s.trim());
+    const [h, p, es, t] = parts;
+    if(!h || !hanziOf(h).length || !es){ bad.push(line); continue; }
+    try{ await saveWord(buildWord(h, p, es, parseTags(t))); ok++; }catch(e){ bad.push(line); }
+  }
+  m.className = "msg " + (bad.length ? "err" : "ok");
+  m.textContent = `${ok} añadidas.` + (bad.length ? ` No entendí ${bad.length} línea(s): ${bad.slice(0,3).join(" / ")}` : "");
+  if(!bad.length) $("#bulk").value = ""; else $("#bulk").value = bad.join("\n");
+});
+
+function backupText(){ return JSON.stringify({app:"zika", exported:new Date().toISOString(), meta, words:[...words.values()]}); }
+$("#exportBtn").addEventListener("click", () => {
+  try{
+    const blob = new Blob([backupText()], {type:"application/json"});
+    const a = document.createElement("a"); a.href = URL.createObjectURL(blob);
+    a.download = "zika-copia-" + new Date().toISOString().slice(0,10) + ".json";
+    document.body.appendChild(a); a.click(); a.remove(); setTimeout(()=>URL.revokeObjectURL(a.href), 4000);
+    $("#bkMsg").className="msg ok"; $("#bkMsg").textContent = `Copia con ${words.size} palabras y tu progreso. Guárdala en Archivos o iCloud.`;
+  }catch(e){ $("#bkMsg").className="msg err"; $("#bkMsg").textContent = "No se pudo crear el archivo; usa «Copiar como texto»."; }
+});
+$("#copyBtn").addEventListener("click", async () => {
+  try{ await navigator.clipboard.writeText(backupText()); $("#bkMsg").className="msg ok"; $("#bkMsg").textContent = "Copia copiada al portapapeles."; }
+  catch(e){ $("#importBox").style.display=""; $("#importTxt").value = backupText(); $("#bkMsg").className="msg"; $("#bkMsg").textContent = "Cópiala desde el cuadro de abajo."; }
+});
+$("#importToggle").addEventListener("click", () => { const b=$("#importBox"); b.style.display = b.style.display==="none"?"":"none"; });
+function restore(txt){
+  const m = $("#bkMsg");
+  try{
+    const d = JSON.parse(txt);
+    const arr = Array.isArray(d) ? d : d.words;
+    if(!Array.isArray(arr)) throw new Error("formato");
+    let n = 0;
+    for(const w of arr){ if(w && w.h && w.es){ const id = idFor(w.h); words.set(id, {...w, id}); meta.deleted = meta.deleted.filter(x => x !== id); n++; } }
+    if(d.meta && d.meta.vocabVersion) meta.vocabVersion = Math.max(meta.vocabVersion, d.meta.vocabVersion);
+    lsSet(); renderAll();
+    m.className="msg ok"; m.textContent = `Restauradas ${n} palabras con su progreso.`; $("#importTxt").value="";
+  }catch(e){ m.className="msg err"; m.textContent = "Eso no parece una copia válida."; }
+}
+$("#importBtn").addEventListener("click", () => restore($("#importTxt").value));
+$("#importFile").addEventListener("change", async e => { const f = e.target.files[0]; if(f) restore(await f.text()); e.target.value = ""; });
+
+/* ---------- Estudio ---------- */
+let studyMode = "write";
+$("#modeSeg").addEventListener("click", e => {
+  const b = e.target.closest("button"); if(!b) return;
+  studyMode = b.dataset.mode;
+  [...$("#modeSeg").children].forEach(x => x.classList.toggle("on", x===b));
+  $("#modeHint").textContent = studyMode==="write" ? "Ves el pinyin y el significado, dibujas el carácter y lo revelas."
+    : "Ves el carácter, piensas el pinyin y el significado, y lo revelas.";
+});
+$("#tagFilter").addEventListener("change", renderStats);
+try{ const v = localStorage.getItem("zika-newper"); if(v) $("#newPer").value = v; }catch(e){}
+$("#newPer").addEventListener("change", () => { try{ localStorage.setItem("zika-newper", $("#newPer").value); }catch(e){} });
+
+let queue = [], qi = 0, total = 0, sess = null, cur = null, pads = [], solWriters = [];
+function buildQueue(all){
+  const tag = $("#tagFilter").value, now = Date.now();
+  const pool = [...words.values()].filter(w => inTag(w,tag));
+  if(all) return shuffle(pool);
+  const due = pool.filter(w => isDue(w,now)).sort((a,b) => (a.srs.due||0)-(b.srs.due||0));
+  const n = Math.max(0, parseInt($("#newPer").value)||0);
+  const fresh = pool.filter(isNew).sort((a,b) => (a.created||0)-(b.created||0)).slice(0,n);
+  return shuffle([...due, ...fresh]);
+}
+function shuffle(a){ for(let i=a.length-1;i>0;i--){ const j=Math.floor(Math.random()*(i+1)); [a[i],a[j]]=[a[j],a[i]]; } return a; }
+
+function startSession(all){
+  queue = buildQueue(all).map(w => w.id);
+  if(!queue.length){
+    $("#startBtn").textContent = "No hay nada pendiente ahora 🙂"; setTimeout(()=> $("#startBtn").textContent = "Empezar sesión", 2200); return;
+  }
+  total = queue.length; qi = 0; sess = {good:0, bad:0, failed:new Set(), seenBad:new Set(), practice:!!all};
+  $("#studyHome").style.display = "none"; $("#sessDone").style.display = "none"; $("#session").style.display = "";
+  showCard();
+}
+$("#startBtn").addEventListener("click", () => startSession(false));
+$("#practiceBtn").addEventListener("click", () => startSession(true));
+$("#quitBtn").addEventListener("click", endSession);
+$("#backHome").addEventListener("click", () => { $("#sessDone").style.display="none"; $("#studyHome").style.display=""; renderStats(); });
+
+function showCard(){
+  if(qi >= queue.length){ endSession(); return; }
+  cur = words.get(queue[qi]);
+  if(!cur){ qi++; showCard(); return; }
+  $("#sessCount").textContent = `${Math.min(qi+1, queue.length)} / ${queue.length}`;
+  $("#sessBar").style.width = (qi/queue.length*100) + "%";
+  $("#revealBtn").style.display = ""; $("#afterReveal").style.display = "none";
+  const ans = $("#answer"); ans.classList.remove("show"); ans.innerHTML = "";
+  const chars = hanziOf(cur.h);
+  const cells = $("#cells"); cells.className = "cells"; cells.innerHTML = ""; pads = []; solWriters = [];
+  if(studyMode==="write"){
+    $("#prompt").innerHTML = `<div class="py">${esc(cur.p)}</div><div class="es">${esc(cur.es)}</div>`;
+    $("#drawTools").style.display = "";
+    const n = chars.length, cols = n<=2 ? n : 2;
+    const avail = Math.min(cells.parentElement.clientWidth - 32, 520);
+    const size = Math.floor(Math.min(n===1 ? 280 : 240, (avail - (cols-1)*10)/cols));
+    cells.style.gridTemplateColumns = `repeat(${cols}, ${size}px)`;
+    chars.forEach(ch => {
+      const cell = document.createElement("div"); cell.className = "cell"; cell.style.width = cell.style.height = size+"px";
+      cell.innerHTML = gridSVG() + `<div class="sol"></div><canvas></canvas>`;
+      cells.appendChild(cell);
+      pads.push(makePad(cell.querySelector("canvas"), size));
+      cell._ch = ch; cell._size = size;
+    });
+  } else {
+    $("#prompt").innerHTML = `<div class="hz">${esc(cur.h)}</div>`;
+    $("#drawTools").style.display = "none";
+    cells.style.gridTemplateColumns = "";
+  }
+}
+
+function reveal(){
+  $("#revealBtn").style.display = "none"; $("#afterReveal").style.display = ""; $("#drawTools").style.display = "none";
+  const chars = hanziOf(cur.h);
+  if(studyMode==="write"){
+    const cells = $("#cells"); cells.classList.add("revealed");
+    [...cells.children].forEach(cell => {
+      const sol = cell.querySelector(".sol");
+      solWriters.push(HanziWriter.create(sol, cell._ch, writerOpts(cell._size, {strokeColor: getComputedStyle(document.documentElement).getPropertyValue("--red").trim(), showOutline:false})));
+    });
+    $("#answer").innerHTML = `<div class="hzline">${esc(cur.h)}</div>`;
+  } else {
+    $("#answer").innerHTML = `<div class="py">${esc(cur.p)}</div><div class="es">${esc(cur.es)}</div>`;
+    // mostrar también los caracteres con Hanzi Writer para poder ver los trazos
+    const cells = $("#cells"); cells.innerHTML = ""; cells.className = "cells revealed";
+    const n = chars.length, size = n<=2 ? 120 : 90;
+    cells.style.gridTemplateColumns = `repeat(${Math.min(n,4)}, ${size}px)`;
+    chars.forEach(ch => {
+      const cell = document.createElement("div"); cell.className="cell"; cell.style.width = cell.style.height = size+"px";
+      cell.innerHTML = gridSVG() + `<div class="sol" style="opacity:1"></div>`; cells.appendChild(cell);
+      solWriters.push(HanziWriter.create(cell.querySelector(".sol"), ch, writerOpts(size)));
+    });
+  }
+  $("#answer").classList.add("show");
+}
+$("#revealBtn").addEventListener("click", reveal);
+$("#animBtn").addEventListener("click", async () => {
+  const cells = $("#cells");
+  solWriters.forEach(w => { try{ w.hideCharacter(); }catch(e){} });
+  cells.classList.add("animating");
+  await animateSeq(solWriters);
+  setTimeout(() => cells.classList.remove("animating"), 900);
+});
+$("#quizBtn").addEventListener("click", () => openQuiz(hanziOf(cur.h)));
+
+async function grade(good){
+  const w = cur; const now = Date.now();
+  const s = {...(w.srs||{box:0, ok:0, bad:0})};
+  {
+    if(good){
+      // si ya se falló en esta sesión, no sube tanto
+      s.box = sess.seenBad.has(w.id) ? Math.max(1, s.box||0) : Math.min(MAXBOX, (s.box||0)+1);
+      s.ok = (s.ok||0)+1;
+      s.due = startOfToday() + INTERVALS[s.box]*DAY + 3*3600000; // disponible a partir de las 3:00 del día que toque
+      if(INTERVALS[s.box]===0) s.due = now;
+    } else {
+      s.box = 0; s.bad = (s.bad||0)+1; s.due = now;
+    }
+    s.last = now;
+  }
+  if(good) sess.good++; else { sess.bad++; sess.failed.add(w.id); }
+  // si falla, vuelve a salir al final de esta sesión (una vez)
+  if(!good && !sess.seenBad.has(w.id)){ sess.seenBad.add(w.id); queue.push(w.id); }
+  qi++;
+  showCard();
+  try{ await updateSrs(w, s); }catch(e){ banner("No se pudo guardar el progreso de una tarjeta ("+(e.code||e.message)+")."); }
+}
+$("#goodBtn").addEventListener("click", () => grade(true));
+$("#badBtn").addEventListener("click", () => grade(false));
+
+function endSession(){
+  $("#session").style.display = "none"; $("#sessDone").style.display = "";
+  $("#dGood").textContent = sess?.good||0; $("#dBad").textContent = sess?.bad||0;
+  const tag = $("#tagFilter").value, now = Date.now();
+  $("#dLeft").textContent = [...words.values()].filter(w => inTag(w,tag) && isDue(w,now)).length;
+  $("#dFailed").innerHTML = sess ? [...sess.failed].map(id => words.get(id)).filter(Boolean)
+    .map(w => `<span class="chip" style="font-family:var(--cjk);font-size:16px">${esc(w.h)} ${esc(w.p)}</span>`).join("") : "";
+  renderStats();
+}
+
+/* ---------- Lienzo de dibujo ---------- */
+function makePad(canvas, size){
+  const dpr = Math.max(1, window.devicePixelRatio||1);
+  canvas.width = size*dpr; canvas.height = size*dpr;
+  const ctx = canvas.getContext("2d"); ctx.scale(dpr,dpr);
+  const strokes = []; let curS = null;
+  const lw = Math.max(5, size*0.045);
+  const color = () => getComputedStyle(document.documentElement).getPropertyValue("--ink").trim() || "#222";
+  function pos(e){ const r = canvas.getBoundingClientRect(); return [(e.clientX-r.left)*size/r.width, (e.clientY-r.top)*size/r.height]; }
+  function drawStroke(pts){
+    ctx.strokeStyle = color(); ctx.lineWidth = lw; ctx.lineCap = "round"; ctx.lineJoin = "round";
+    ctx.beginPath(); ctx.moveTo(pts[0][0], pts[0][1]);
+    if(pts.length===1){ ctx.lineTo(pts[0][0]+.1, pts[0][1]+.1); }
+    for(let i=1;i<pts.length-1;i++){ const mx=(pts[i][0]+pts[i+1][0])/2, my=(pts[i][1]+pts[i+1][1])/2; ctx.quadraticCurveTo(pts[i][0],pts[i][1],mx,my); }
+    if(pts.length>1){ const l = pts[pts.length-1]; ctx.lineTo(l[0],l[1]); }
+    ctx.stroke();
+  }
+  function redraw(){ ctx.clearRect(0,0,size,size); strokes.forEach(drawStroke); if(curS) drawStroke(curS); }
+  canvas.addEventListener("pointerdown", e => { if($("#cells").classList.contains("revealed")) return; e.preventDefault(); canvas.setPointerCapture(e.pointerId); curS = [pos(e)]; redraw(); });
+  canvas.addEventListener("pointermove", e => { if(!curS) return; e.preventDefault(); const evs = e.getCoalescedEvents ? e.getCoalescedEvents() : [e]; evs.forEach(ev => curS.push(pos(ev))); redraw(); });
+  const end = () => { if(curS){ strokes.push(curS); curS = null; redraw(); lastPad = api; } };
+  canvas.addEventListener("pointerup", end); canvas.addEventListener("pointercancel", end);
+  canvas.addEventListener("touchstart", e => e.preventDefault(), {passive:false});
+  const api = { undo(){ strokes.pop(); redraw(); }, clear(){ strokes.length = 0; redraw(); }, get count(){ return strokes.length; } };
+  return api;
+}
+let lastPad = null;
+$("#undoBtn").addEventListener("click", () => { (lastPad && pads.includes(lastPad) && lastPad.count ? lastPad : [...pads].reverse().find(p => p.count))?.undo(); });
+$("#clearBtn").addEventListener("click", () => pads.forEach(p => p.clear()));
+
+/* ---------- Inicio ---------- */
+route(); renderAll(); checkVocab(false); startOffline();
+window.addEventListener("online", () => checkVocab(false));
+$("#dlStrokes").addEventListener("click", downloadStrokes);
+$("#checkBtn").addEventListener("click", () => checkVocab(true));
+$("#reloadBtn").addEventListener("click", () => location.reload());
+})();
+</script>
+</body>
+</html>
