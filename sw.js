@@ -1,7 +1,8 @@
 /* 字卡 — service worker: hace que la app funcione sin conexión */
-const VERSION = "2026-11-16b";
+const VERSION = "2026-11-17a";
 const SHELL = "zika-shell-" + VERSION;
 const CHARS = "zika-chars-v1";
+const AUDIO = "zika-audio-v1";
 const SHELL_FILES = [
   "./",
   "index.html",
@@ -36,11 +37,12 @@ self.addEventListener("fetch", event => {
   // El vocabulario siempre se pide a la red (la app guarda su propia copia)
   if (url.pathname.endsWith("/vocab.json")) return;
 
-  // Trazos de caracteres: primero la caché, si no la red (y se guardan)
-  if (url.pathname.includes("/chardata/")) {
+  // Trazos y audios: primero la caché, si no la red (y se guardan)
+  const dir = url.pathname.includes("/chardata/") ? "chardata/" : url.pathname.includes("/audio/") ? "audio/" : null;
+  if (dir) {
     event.respondWith((async () => {
-      const c = await caches.open(CHARS);
-      const key = url.pathname.slice(url.pathname.indexOf("chardata/"));
+      const c = await caches.open(dir === "audio/" ? AUDIO : CHARS);
+      const key = url.pathname.slice(url.pathname.indexOf(dir));
       const hit = await c.match(key);
       if (hit) return hit;
       const res = await fetch(req);

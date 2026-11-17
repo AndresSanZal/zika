@@ -108,6 +108,12 @@ textarea{min-height:120px;resize:vertical;font-family:var(--cjk)}
 .answer .py{font-size:22px;font-weight:600}
 .answer .es{color:var(--muted)}
 .answer .hzline{font-family:var(--cjk);font-size:40px}
+.spkrow{margin-top:8px;display:flex;justify-content:center}
+.spk{appearance:none;border:1px solid var(--line);background:var(--paper);border-radius:999px;padding:6px 14px 6px 10px;font-size:18px;cursor:pointer;display:inline-flex;align-items:center;gap:6px;color:var(--ink)}
+.spk span{font-size:12px;color:var(--muted);font-weight:600}
+.spk:active{transform:scale(.96)}
+label.chk{display:flex;align-items:center;gap:8px;font-size:14px;margin-top:12px;color:var(--ink)}
+label.chk input{width:18px;height:18px;accent-color:var(--red)}
 
 /* Dictionary */
 .list{display:flex;flex-direction:column;gap:6px}
@@ -162,6 +168,7 @@ textarea{min-height:120px;resize:vertical;font-family:var(--cjk)}
         <select id="tagFilter"></select>
         <label class="f">Palabras nuevas por sesión</label>
         <input type="number" id="newPer" min="0" max="100" value="10" inputmode="numeric">
+        <label class="chk"><input type="checkbox" id="autoSpeak"> Reproducir la pronunciación al revelar</label>
         <div style="height:14px"></div>
         <button class="btn primary block" id="startBtn">Empezar sesión</button>
         <button class="btn ghost block" id="practiceBtn" style="margin-top:8px">Repasar todo el grupo (sin esperar fechas)</button>
@@ -248,8 +255,9 @@ textarea{min-height:120px;resize:vertical;font-family:var(--cjk)}
     <div class="card">
       <h3>Sin conexión y actualizaciones</h3>
       <p class="hint" id="offStatus">Comprobando…</p>
+      <p class="hint" id="voiceStatus"></p>
       <div class="row">
-        <button class="btn grow" id="dlStrokes" style="display:none">Descargar trazos (≈10 MB)</button>
+        <button class="btn grow" id="dlStrokes" style="display:none">Descargar trazos y audios</button>
         <button class="btn grow" id="checkBtn">Buscar vocabulario nuevo</button>
       </div>
       <p class="hint">Cuando tengas conexión, la app comprueba sola si hay palabras nuevas de tus clases y las añade sin tocar tu progreso.</p>
@@ -367,11 +375,17 @@ function mergeVocab(remote){
     const l = words.get(r.id);
     if(!l){
       const w = {id:r.id, h:r.h, p:r.p, es:r.es, tags:r.tags||[], created:r.created||Date.now(), src:r.src||"vocab"};
+      if(r.a) w.a = 1;
       if(first && r.srs) w.srs = r.srs;                  // solo al instalar: progreso migrado
       words.set(r.id, w); added++; (r.tags||[]).forEach(t => newTags.add(t));
-    } else if(!l.localEdit){
-      const same = l.h===r.h && l.p===r.p && l.es===r.es && JSON.stringify(l.tags||[])===JSON.stringify(r.tags||[]) && l.created===r.created;
-      if(!same){ words.set(r.id, {...l, h:r.h, p:r.p, es:r.es, tags:r.tags||[], created:r.created||l.created}); updated++; }
+    } else {
+      let w = l;
+      if(!!w.a !== !!r.a){ w = {...w}; if(r.a) w.a = 1; else delete w.a; }   // el audio siempre se sincroniza
+      if(!w.localEdit){                                                          // tus ediciones mandan
+        const same = w.h===r.h && w.p===r.p && w.es===r.es && JSON.stringify(w.tags||[])===JSON.stringify(r.tags||[]) && w.created===r.created;
+        if(!same){ w = {...w, h:r.h, p:r.p, es:r.es, tags:r.tags||[], created:r.created||w.created}; updated++; }
+      }
+      if(w !== l) words.set(r.id, w);
     }
   }
   meta.vocabVersion = remote.version || meta.vocabVersion;
@@ -407,36 +421,113 @@ async function checkVocab(manual){
   }
 }
 
-/* ---------- Modo sin conexión: service worker y trazos ---------- */
-const CHAR_CACHE = "zika-chars-v1", NSHARDS = 128;
-async function strokesStatus(){
-  try{ const c = await caches.open(CHAR_CACHE); const keys = await c.keys(); return keys.length; }catch(e){ return -1; }
+/* ---------- Modo sin conexión: service worker, trazos y audios ---------- */
+const CHAR_CACHE = "zika-chars-v1", AUDIO_CACHE = "zika-audio-v1", NSHARDS = 128;
+function offlineWanted(){
+  const list = [];
+  for(let i=0;i<NSHARDS;i++) list.push({cache:CHAR_CACHE, url:`chardata/s${i}.json`});
+  words.forEach(w => { if(w.a) list.push({cache:AUDIO_CACHE, url:`audio/${w.id}.mp3`}); });
+  return list;
+}
+async function offlineMissing(){
+  try{
+    const have = {};
+    for(const name of [CHAR_CACHE, AUDIO_CACHE]){
+      const c = await caches.open(name);
+      have[name] = new Set((await c.keys()).map(k => new URL(k.url).pathname.split("/").slice(-2).join("/")));
+    }
+    const all = offlineWanted();
+    return {all, missing: all.filter(x => !have[x.cache].has(x.url))};
+  }catch(e){ return null; }
 }
 async function renderOffline(){
-  const n = await strokesStatus(); const el = $("#offStatus"); if(!el) return;
-  if(n < 0){ el.textContent = "Este navegador no permite guardar los trazos."; return; }
-  el.textContent = n >= NSHARDS ? "✓ Trazos de todos los caracteres guardados en el dispositivo." : `Trazos guardados: ${Math.round(n/NSHARDS*100)} %`;
-  $("#dlStrokes").style.display = n >= NSHARDS ? "none" : "";
+  const el = $("#offStatus"); if(!el) return;
+  const st = await offlineMissing();
+  if(!st){ el.textContent = "Este navegador no permite guardar datos sin conexión."; return; }
+  const nAudio = st.all.filter(x => x.cache===AUDIO_CACHE).length;
+  const missA = st.missing.filter(x => x.cache===AUDIO_CACHE).length, missC = st.missing.length - missA;
+  el.textContent = !st.missing.length
+    ? `✓ Trazos de todos los caracteres y ${nAudio} grabaciones guardados en el dispositivo.`
+    : `Pendiente de guardar: ${missC ? Math.round(missC/NSHARDS*100) + " % de los trazos" : ""}${missC && missA ? " y " : ""}${missA ? missA + " grabaciones" : ""}.`;
+  $("#dlStrokes").style.display = st.missing.length ? "" : "none";
+  renderVoiceStatus();
 }
 let dlRunning = false;
-async function downloadStrokes(){
+async function downloadOffline(quiet){
   if(dlRunning) return; dlRunning = true;
   const btn = $("#dlStrokes"); btn.disabled = true;
   try{
-    const c = await caches.open(CHAR_CACHE);
-    const have = new Set((await c.keys()).map(k => new URL(k.url).pathname.split("/").pop()));
-    const todo = []; for(let i=0;i<NSHARDS;i++){ if(!have.has(`s${i}.json`)) todo.push(i); }
-    let done = NSHARDS - todo.length;
+    const st = await offlineMissing(); if(!st) throw new Error("caches");
+    const todo = st.missing; let done = 0;
     for(let k=0;k<todo.length;k+=4){
-      await Promise.all(todo.slice(k,k+4).map(async i => {
-        const url = `chardata/s${i}.json`; const r = await fetch(url); if(r.ok){ await c.put(url, r); done++; }
+      await Promise.all(todo.slice(k,k+4).map(async x => {
+        const r = await fetch(x.url); if(r.ok){ await (await caches.open(x.cache)).put(x.url, r); done++; }
       }));
-      btn.textContent = `Descargando… ${Math.round(done/NSHARDS*100)} %`;
+      btn.textContent = `Descargando… ${Math.round(done/todo.length*100)} %`;
     }
-    toast("✓ Trazos guardados: ya funciona todo sin conexión.");
-  }catch(e){ toast("Se cortó la descarga. Vuelve a intentarlo con conexión."); }
-  btn.disabled = false; btn.textContent = "Descargar trazos (≈10 MB)"; dlRunning = false; renderOffline();
+    if(todo.length && !quiet) toast("✓ Trazos y audios guardados: ya funciona todo sin conexión.");
+  }catch(e){ if(!quiet) toast("Se cortó la descarga. Vuelve a intentarlo con conexión."); }
+  btn.disabled = false; btn.textContent = "Descargar trazos y audios"; dlRunning = false; renderOffline();
 }
+const downloadStrokes = () => downloadOffline(false);
+
+/* ---------- Pronunciación: grabación real (audio-cmn) o voz china del dispositivo ---------- */
+let zhVoice = null;
+function pickVoice(){
+  try{
+    const vs = speechSynthesis.getVoices();
+    const zh = vs.filter(v => /^zh[-_](CN|Hans)/i.test(v.lang) || /^cmn/i.test(v.lang));
+    zhVoice = zh.find(v => v.localService && /premium|enhanced|mejorad/i.test(v.name)) || zh.find(v => v.localService) || zh[0] || vs.find(v => /^zh/i.test(v.lang)) || null;
+  }catch(e){ zhVoice = null; }
+  renderVoiceStatus();
+}
+const hasTTS = () => "speechSynthesis" in window;
+if(hasTTS()){ pickVoice(); try{ speechSynthesis.addEventListener("voiceschanged", pickVoice); }catch(e){} }
+function renderVoiceStatus(){
+  const el = $("#voiceStatus"); if(!el) return;
+  el.innerHTML = !hasTTS() ? "Este navegador no tiene voz sintética: solo sonarán las grabaciones reales."
+    : zhVoice ? `Voz para palabras sin grabación: <b>${esc(zhVoice.name)}</b>.`
+    : "No se encontró voz china en el dispositivo. En el iPhone: Ajustes → Accesibilidad → Contenido leído → Voces → Chino (China) → descarga una voz.";
+}
+const audioEls = new Map();      // id -> {el, url}
+async function prepareAudio(w){
+  if(!w || !w.a || audioEls.has(w.id)) return;
+  audioEls.set(w.id, null);
+  try{
+    const r = await fetch(`audio/${w.id}.mp3`); if(!r.ok) throw new Error(r.status);
+    const url = URL.createObjectURL(await r.blob());
+    const el = new Audio(url); el.preload = "auto";
+    audioEls.set(w.id, {el, url});
+    if(audioEls.size > 40){ const [k, v] = audioEls.entries().next().value; if(v){ URL.revokeObjectURL(v.url); } audioEls.delete(k); }
+  }catch(e){ audioEls.delete(w.id); }
+}
+function speak(w){
+  if(!w) return false;
+  const rec = audioEls.get(w.id);
+  if(rec && rec.el){
+    try{ if(hasTTS()) speechSynthesis.cancel(); rec.el.currentTime = 0; const p = rec.el.play(); if(p && p.catch) p.catch(() => tts(w)); return true; }catch(e){}
+  }
+  if(w.a && navigator.onLine && !rec){ try{ const el = new Audio(`audio/${w.id}.mp3`); el.play().catch(() => tts(w)); return true; }catch(e){} }
+  return tts(w);
+}
+function tts(w){
+  if(!hasTTS()) { toast("No hay voz disponible para esta palabra."); return false; }
+  try{
+    speechSynthesis.cancel();
+    const u = new SpeechSynthesisUtterance(w.h);
+    u.lang = "zh-CN"; if(zhVoice) u.voice = zhVoice; u.rate = 0.8;
+    speechSynthesis.speak(u); return true;
+  }catch(e){ return false; }
+}
+function speakBtn(w){
+  const real = !!w.a;
+  return `<button class="spk" data-say="${esc(w.id)}" aria-label="Escuchar pronunciación">🔊<span>${real ? "voz real" : "voz sintética"}</span></button>`;
+}
+document.addEventListener("click", e => {
+  const b = e.target.closest("[data-say]"); if(!b) return;
+  e.preventDefault(); e.stopPropagation();
+  const w = words.get(b.dataset.say); if(w) speak(w);
+}, true);
 
 async function startOffline(){
   if("serviceWorker" in navigator){
@@ -452,9 +543,9 @@ async function startOffline(){
   }
   try{ if(navigator.storage && navigator.storage.persist) await navigator.storage.persist(); }catch(e){}
   await renderOffline();
-  // descarga automática de trazos la primera vez que hay conexión
-  const n = await strokesStatus();
-  if(n >= 0 && n < NSHARDS && navigator.onLine) downloadStrokes();
+  // descarga automática de trazos y audios que falten cuando hay conexión
+  const st = await offlineMissing();
+  if(st && st.missing.length && navigator.onLine) downloadOffline(st.missing.length < NSHARDS);
 }
 
 /* ---------- Navegación ---------- */
@@ -541,13 +632,14 @@ $("#modal").addEventListener("click", e => { if(e.target.id==="modal") closeModa
 
 function openDetail(id){
   const w = words.get(id); if(!w) return;
+  prepareAudio(w);
   const chars = hanziOf(w.h);
   const s = w.srs||{};
   openModal(`
     <button class="btn small ghost close" data-act="close">Cerrar</button>
     <div style="clear:both"></div>
     <div class="detail-chars" id="dChars">${chars.map(()=>`<div class="cell">${gridSVG()}<div class="sol" style="opacity:1"></div></div>`).join("")}</div>
-    <div class="center"><div style="font-size:24px;font-weight:600">${esc(w.p)}</div><div style="font-size:18px;color:var(--muted);margin-top:2px">${esc(w.es)}</div></div>
+    <div class="center"><div style="font-size:24px;font-weight:600">${esc(w.p)}</div><div class="spkrow">${speakBtn(w)}</div><div style="font-size:18px;color:var(--muted);margin-top:2px">${esc(w.es)}</div></div>
     <div class="chips" style="justify-content:center;margin:10px 0">${(w.tags||[]).map(t=>`<span class="chip">${esc(t)}</span>`).join("")}</div>
     <p class="hint center">${isNew(w) ? "Aún no estudiada" : `Nivel ${s.box||0} · ${s.ok||0} bien / ${s.bad||0} mal · próximo repaso: ${fmtDate(s.due)}`}</p>
     <div class="row" style="justify-content:center">
@@ -696,6 +788,10 @@ $("#importFile").addEventListener("change", async e => { const f = e.target.file
 
 /* ---------- Estudio ---------- */
 let studyMode = "write";
+let autoSpeak = false;
+try{ autoSpeak = localStorage.getItem("zika-autospeak") === "1"; }catch(e){}
+$("#autoSpeak").checked = autoSpeak;
+$("#autoSpeak").addEventListener("change", e => { autoSpeak = e.target.checked; try{ localStorage.setItem("zika-autospeak", autoSpeak ? "1" : "0"); }catch(_){} });
 $("#modeSeg").addEventListener("click", e => {
   const b = e.target.closest("button"); if(!b) return;
   studyMode = b.dataset.mode;
@@ -742,9 +838,10 @@ function showCard(){
   $("#revealBtn").style.display = ""; $("#afterReveal").style.display = "none";
   const ans = $("#answer"); ans.classList.remove("show"); ans.innerHTML = "";
   const chars = hanziOf(cur.h);
+  prepareAudio(cur); const nx = words.get(queue[qi+1]); if(nx) prepareAudio(nx);
   const cells = $("#cells"); cells.className = "cells"; cells.innerHTML = ""; pads = []; solWriters = [];
   if(studyMode==="write"){
-    $("#prompt").innerHTML = `<div class="py">${esc(cur.p)}</div><div class="es">${esc(cur.es)}</div>`;
+    $("#prompt").innerHTML = `<div class="py">${esc(cur.p)}</div><div class="es">${esc(cur.es)}</div><div class="spkrow">${speakBtn(cur)}</div>`;
     $("#drawTools").style.display = "";
     const n = chars.length, cols = n<=2 ? n : 2;
     const avail = Math.min(cells.parentElement.clientWidth - 32, 520);
@@ -765,6 +862,7 @@ function showCard(){
 }
 
 function reveal(){
+  if(autoSpeak) speak(cur);
   $("#revealBtn").style.display = "none"; $("#afterReveal").style.display = ""; $("#drawTools").style.display = "none";
   const chars = hanziOf(cur.h);
   if(studyMode==="write"){
@@ -775,7 +873,7 @@ function reveal(){
     });
     $("#answer").innerHTML = `<div class="hzline">${esc(cur.h)}</div>`;
   } else {
-    $("#answer").innerHTML = `<div class="py">${esc(cur.p)}</div><div class="es">${esc(cur.es)}</div>`;
+    $("#answer").innerHTML = `<div class="py">${esc(cur.p)}</div><div class="es">${esc(cur.es)}</div><div class="spkrow">${speakBtn(cur)}</div>`;
     // mostrar también los caracteres con Hanzi Writer para poder ver los trazos
     const cells = $("#cells"); cells.innerHTML = ""; cells.className = "cells revealed";
     const n = chars.length, size = n<=2 ? 120 : 90;
