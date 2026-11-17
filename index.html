@@ -405,6 +405,7 @@ async function checkVocab(manual){
     meta.lastCheck = Date.now();
     // La fusión es idempotente: se aplica siempre (así una versión antigua de la app no puede "saltarse" cambios)
     const res = mergeVocab(remote);
+    renderOffline();
     offlineMissing().then(st => { if(st && st.missing.length && navigator.onLine) downloadOffline(true); });
     renderAll(); setSync("ok", "Al día · " + words.size + " palabras");
     const parts = [];

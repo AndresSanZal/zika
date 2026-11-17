@@ -1,5 +1,5 @@
 /* 字卡 — service worker: hace que la app funcione sin conexión */
-const VERSION = "2026-11-17c";
+const VERSION = "2026-11-17d";
 const SHELL = "zika-shell-" + VERSION;
 const CHARS = "zika-chars-v1";
 const AUDIO = "zika-audio-v1";
