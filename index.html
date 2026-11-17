@@ -364,7 +364,7 @@ meta = Object.assign(meta, lsGet(LS_META)||{});
 /* Fusiona el vocabulario publicado (vocab.json) sin tocar tu progreso ni tus ediciones */
 function mergeVocab(remote){
   const first = words.size === 0;
-  let added = 0, updated = 0, removed = 0; const newTags = new Set();
+  let added = 0, updated = 0, removed = 0, audio = 0; const newTags = new Set();
   for(const id of (remote.deleted||[])){
     const w = words.get(id);
     if(w && !w.localEdit){ words.delete(id); removed++; }
@@ -380,7 +380,7 @@ function mergeVocab(remote){
       words.set(r.id, w); added++; (r.tags||[]).forEach(t => newTags.add(t));
     } else {
       let w = l;
-      if(!!w.a !== !!r.a){ w = {...w}; if(r.a) w.a = 1; else delete w.a; }   // el audio siempre se sincroniza
+      if(!!w.a !== !!r.a){ w = {...w}; if(r.a) w.a = 1; else delete w.a; audio++; }   // el audio siempre se sincroniza
       if(!w.localEdit){                                                          // tus ediciones mandan
         const same = w.h===r.h && w.p===r.p && w.es===r.es && JSON.stringify(w.tags||[])===JSON.stringify(r.tags||[]) && w.created===r.created;
         if(!same){ w = {...w, h:r.h, p:r.p, es:r.es, tags:r.tags||[], created:r.created||w.created}; updated++; }
@@ -390,7 +390,7 @@ function mergeVocab(remote){
   }
   meta.vocabVersion = remote.version || meta.vocabVersion;
   lsSet();
-  return {added, updated, removed, tags:[...newTags], first};
+  return {added, updated, removed, audio, tags:[...newTags], first};
 }
 
 async function checkVocab(manual){
@@ -403,14 +403,16 @@ async function checkVocab(manual){
     if(!r.ok) throw new Error(r.status);
     const remote = await r.json();
     meta.lastCheck = Date.now();
-    if((remote.version||0) <= meta.vocabVersion && words.size){ lsSet(); setSync("ok", "Al día · " + words.size + " palabras"); if(manual) toast("Ya tienes el vocabulario más reciente."); return; }
+    // La fusión es idempotente: se aplica siempre (así una versión antigua de la app no puede "saltarse" cambios)
     const res = mergeVocab(remote);
+    offlineMissing().then(st => { if(st && st.missing.length && navigator.onLine) downloadOffline(true); });
     renderAll(); setSync("ok", "Al día · " + words.size + " palabras");
     const parts = [];
     const pl = (n, one, many) => n + " " + (n === 1 ? one : many);
     if(res.added) parts.push(pl(res.added, "palabra nueva", "palabras nuevas") + (res.tags.length && !res.first ? " (" + res.tags.slice(0,3).join(", ") + ")" : ""));
     if(res.updated) parts.push(pl(res.updated, "corregida", "corregidas"));
     if(res.removed) parts.push(pl(res.removed, "eliminada", "eliminadas"));
+    if(res.audio && !res.first) parts.push(pl(res.audio, "pronunciación añadida", "pronunciaciones añadidas"));
     if(parts.length) toast("✓ " + parts.join(" · "));
     else if(manual) toast("Ya tienes el vocabulario más reciente.");
   }catch(e){
@@ -457,15 +459,18 @@ async function downloadOffline(quiet){
   if(dlRunning) return; dlRunning = true;
   const btn = $("#dlStrokes"); btn.disabled = true;
   try{
-    const st = await offlineMissing(); if(!st) throw new Error("caches");
-    const todo = st.missing; let done = 0;
+    let st = await offlineMissing(); if(!st) throw new Error("caches");
+    let todo = st.missing; let done = 0;
     for(let k=0;k<todo.length;k+=4){
       await Promise.all(todo.slice(k,k+4).map(async x => {
         const r = await fetch(x.url); if(r.ok){ await (await caches.open(x.cache)).put(x.url, r); done++; }
       }));
       btn.textContent = `Descargando… ${Math.round(done/todo.length*100)} %`;
     }
-    if(todo.length && !quiet) toast("✓ Trazos y audios guardados: ya funciona todo sin conexión.");
+    st = await offlineMissing();                          // por si llegó vocabulario nuevo mientras tanto
+    if(st && st.missing.length){ todo = st.missing; done = 0;
+      for(let k=0;k<todo.length;k+=4){ await Promise.all(todo.slice(k,k+4).map(async x => { const r = await fetch(x.url); if(r.ok){ await (await caches.open(x.cache)).put(x.url, r); } })); } }
+    if(!quiet) toast("✓ Trazos y audios guardados: ya funciona todo sin conexión.");
   }catch(e){ if(!quiet) toast("Se cortó la descarga. Vuelve a intentarlo con conexión."); }
   btn.disabled = false; btn.textContent = "Descargar trazos y audios"; dlRunning = false; renderOffline();
 }
