@@ -1,5 +1,5 @@
 /* 字卡 — service worker: hace que la app funcione sin conexión */
-const VERSION = "2026-11-17b";
+const VERSION = "2026-11-17c";
 const SHELL = "zika-shell-" + VERSION;
 const CHARS = "zika-chars-v1";
 const AUDIO = "zika-audio-v1";
@@ -16,7 +16,9 @@ const SHELL_FILES = [
 ];
 
 self.addEventListener("install", event => {
-  event.waitUntil(caches.open(SHELL).then(c => c.addAll(SHELL_FILES)).then(() => self.skipWaiting()));
+  event.waitUntil(caches.open(SHELL)
+    .then(c => c.addAll(SHELL_FILES.map(u => new Request(u, { cache: "reload" }))))   // sin pasar por la caché HTTP
+    .then(() => self.skipWaiting()));
 });
 
 self.addEventListener("activate", event => {
@@ -57,7 +59,7 @@ self.addEventListener("fetch", event => {
     const c = await caches.open(SHELL);
     const isNav = req.mode === "navigate";
     const cached = isNav ? (await c.match("index.html")) : (await c.match(req, { ignoreSearch: true }));
-    const network = fetch(req).then(res => {
+    const network = fetch(req, { cache: "no-cache" }).then(res => {   // revalida con el servidor
       if (res.ok) c.put(isNav ? "index.html" : req, res.clone());
       return res;
     }).catch(() => null);
