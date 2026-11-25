@@ -1,6 +1,6 @@
 {
   "version": 2,
-  "updated": "2026-11-23",
+  "updated": "2026-11-25",
   "note": "Vocabulario de 字卡. La app lo fusiona sin tocar el progreso local.",
   "deleted": [],
   "words": [
@@ -517,6 +517,10 @@
     {"id": "w-4e0a-8fb9", "h": "上边", "p": "shàngbian", "es": "encima, arriba", "tags": ["Lección 7"], "created": 1794795045200, "src": "clase", "a": 1},
     {"id": "w-4e0b-8fb9", "h": "下边", "p": "xiàbian", "es": "debajo, abajo", "tags": ["Lección 7"], "created": 1794795045300, "src": "clase", "a": 1},
     {"id": "w-5de6-8fb9", "h": "左边", "p": "zuǒbian", "es": "a la izquierda", "tags": ["Lección 7"], "created": 1794795045400, "src": "clase", "a": 1},
-    {"id": "w-53f3-8fb9", "h": "右边", "p": "yòubian", "es": "a la derecha", "tags": ["Lección 7"], "created": 1794795045500, "src": "clase", "a": 1}
+    {"id": "w-53f3-8fb9", "h": "右边", "p": "yòubian", "es": "a la derecha", "tags": ["Lección 7"], "created": 1794795045500, "src": "clase", "a": 1},
+    {"id": "w-7b14-8bb0-672c-7535-8111", "h": "笔记本电脑", "p": "bǐjìběn diànnǎo", "es": "ordenador portátil", "tags": ["Lección 7"], "created": 1794795597970, "src": "clase"},
+    {"id": "w-5145-7535-5668", "h": "充电器", "p": "chōngdiànqì", "es": "cargador", "tags": ["Lección 7"], "created": 1794795598070, "src": "clase"},
+    {"id": "w-8033-673a", "h": "耳机", "p": "ěrjī", "es": "auriculares", "tags": ["Lección 7"], "created": 1794795598170, "src": "clase"},
+    {"id": "w-7b14-8bb0", "h": "笔记", "p": "bǐjì", "es": "apuntes, notas", "tags": ["Lección 7"], "created": 1794795598270, "src": "clase", "a": 1}
   ]
 }
